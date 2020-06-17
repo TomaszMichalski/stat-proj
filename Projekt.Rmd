@@ -1,0 +1,87 @@
+---
+title: "Projekt zaliczeniowy"
+author: "Tomasz Michalski, Aleksander Mikucki"
+date: "17 06 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Wstęp
+
+W projekcie korzystamy ze zbioru Bike Sharing Demand:\
+https://www.kaggle.com/c/bike-sharing-demand/ \
+Zawiera on godzinowe dane dot. wynajmu rowerów obejmujące dwa lata.\
+Projekt ma na celu porównanie różnych metod statystycznych i ich jakości w przewidywaniu liczby wynajętych rowerów.
+
+### Ładowanie danych
+
+Podzieliliśmy kolumnę `datetime` poprzez wyeksportowanie do osobnych kolumn miesiąca, dnia i godziny.\
+Usunęliśmy także kolumny `casual` i `registered`, gdyż chcemy skupić się na kolumnie `count`, która jest ich sumą.
+
+```{r}
+bike <- read.csv("data.csv", header = TRUE)
+bike <- bike[, -c(10, 11)]
+
+bike$datetime <-as.POSIXct(bike$datetime, format="%Y-%m-%d %H:%M:%S")
+bike$month <- strftime(bike$datetime, '%m')
+bike$month <- as.integer(bike$month)
+bike$day <-  strftime(bike$datetime, '%d')
+bike$day <- as.integer(bike$day)
+bike$hour <- substring(bike$datetime, 12,13)
+bike$hour <- as.integer(bike$hour)
+
+bike <- bike[,-1]
+
+set.seed(1)
+n <- nrow(bike)
+train <- sample(1:n, n / 2)
+test <- -train
+```
+
+### Prezentacja danych
+
+```{r}
+cat("Wierszy w zbiorze: ", nrow(bike), "\n")
+```
+
+```{r}
+head(bike)
+```
+
+## Regresja liniowa
+
+### Regresja dla każdego predyktora osobno
+
+Dopasowujemy model prostej regresji dla każdego predyktora osobno.
+
+```{r}
+simple_coef <- c()
+for (predictor in names(bike)) {
+  if (predictor != "count") {
+    lmFitSimple <- lm(count ~ bike[, predictor], data = bike)
+    simple_coef <- append(simple_coef, lmFitSimple$coefficients[2])
+    cat("########", predictor)
+    print(summary(lmFitSimple))
+  }
+}
+```
+
+#### Wnioski
+
+Otrzymaliśmy wysoką istotność statystyczną dla predyktorów `season`, `weather`, `temp`, `atemp`, `humidity`, `windspeed`, `month`, oraz `hour`.
+
+### Regresja wielokrotna
+
+Wykonujemy regresję zmiennej `count` względem wszystkich pozostałych.
+
+```{r}
+lmFit <- lm(count ~ ., data = bike)
+summary(lmFit)
+```
+
+#### Wnioski
+
+Korzystając z `summary`, możemy zauważyć, że cechami najbardziej istotnymi statystycznie są `atemp`, `humidity`, `month` oraz `hour`.
