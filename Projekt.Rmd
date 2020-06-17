@@ -23,6 +23,7 @@ Usunęliśmy także kolumny `casual` i `registered`, gdyż chcemy skupić się n
 
 ```{r}
 bike <- read.csv("data.csv", header = TRUE)
+bike <- bike[bike$datetime >= "2012-01-01 00:00:00", ]
 bike <- bike[, -c(10, 11)]
 
 bike$datetime <-as.POSIXct(bike$datetime, format="%Y-%m-%d %H:%M:%S")
