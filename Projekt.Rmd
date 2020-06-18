@@ -9,6 +9,12 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+library(tree)
+library(randomForest)
+library(gbm)
+```
+
 ## Wstęp
 
 W projekcie korzystamy ze zbioru Bike Sharing Demand:\
@@ -62,15 +68,13 @@ Dopasowujemy model prostej regresji dla każdego predyktora osobno.
 simple_coef <- c()
 for (predictor in names(bike)) {
   if (predictor != "count") {
-    lmFitSimple <- lm(count ~ bike[, predictor], data = bike)
+    lmFitSimple <- lm(count ~ bike[, predictor], data = bike, subset = train)
     simple_coef <- append(simple_coef, lmFitSimple$coefficients[2])
     cat("########", predictor)
     print(summary(lmFitSimple))
   }
 }
 ```
-
-#### Wnioski
 
 Otrzymaliśmy wysoką istotność statystyczną dla predyktorów `season`, `weather`, `temp`, `atemp`, `humidity`, `windspeed`, `month`, oraz `hour`.
 
@@ -79,10 +83,130 @@ Otrzymaliśmy wysoką istotność statystyczną dla predyktorów `season`, `weat
 Wykonujemy regresję zmiennej `count` względem wszystkich pozostałych.
 
 ```{r}
-lmFit <- lm(count ~ ., data = bike)
+lmFit <- lm(count ~ ., data = bike, subset = train)
 summary(lmFit)
 ```
 
-#### Wnioski
+Korzystając z `summary`, możemy zauważyć, że cechami najbardziej istotnymi statystycznie są `humidity`, `month` oraz `hour`.
 
-Korzystając z `summary`, możemy zauważyć, że cechami najbardziej istotnymi statystycznie są `atemp`, `humidity`, `month` oraz `hour`.
+## TODO
+
+## TODO
+
+## Drzewa decyzyjne
+
+### Drzewa regresyjne
+
+Konstruujemy drzewo decyzyjne dla problemu regresji `count` względem pozostałych zmiennych.
+
+```{r}
+count.tree <- tree(count ~ ., data = bike, subset = train)
+summary(count.tree)
+```
+
+Przedstawienie drzewa.
+
+```{r}
+plot(count.tree)
+text(count.tree)
+```
+
+Metodą zbioru walidacyjnego szacujemy błąd testowy.
+
+```{r}
+count.tree.pred <- predict(count.tree, newdata = bike[test, ])
+mean((count.tree.pred - bike$count[test])^2)
+```
+
+Wyznaczamy optymalne poddrzewo metodą przycinania sterowanego złożonością.
+
+```{r}
+count.tree.cv <- cv.tree(count.tree)
+plot(count.tree.cv$size, count.tree.cv$dev, type = "b")
+```
+
+W tym przypadku przycinanie drzewa nie wytworzy bardziej optymalnego drzewa.
+
+### Bagging
+
+Bagging dla regresji `count` względem wszystkich pozostałych zmiennych.
+
+```{r}
+count.bag <- randomForest(count ~ ., data = bike, subset = train, mtry = 6, importance = TRUE)
+count.bag
+```
+
+Wyznaczenie ważności predyktorów.
+
+```{r}
+importance(count.bag)
+varImpPlot(count.bag)
+```
+
+Oszacowanie błędu testowego dla poprzednio wyznaczonego zbioru walidacyjnego.
+
+```{r}
+count.bag.pred <- predict(count.bag, newdata = bike[test,])
+mean((count.bag.pred - bike$count[test])^2)
+```
+
+### Lasy losowe
+
+Lasy losowe dla regresji `count` względem wszystkich pozostałych zmiennych.
+
+```{r}
+count.rf <- randomForest(count ~ ., data = bike, subset = train, importance = TRUE)
+count.rf
+```
+
+Wyznaczenie ważności predyktorów.
+
+```{r}
+importance(count.rf)
+varImpPlot(count.rf)
+```
+
+Oszacowanie błędu testowego dla poprzednio wyznaczonego zbioru walidacyjnego.
+
+```{r}
+count.rf.pred <- predict(count.rf, newdata = bike[test,])
+mean((count.rf.pred - bike$count[test])^2)
+```
+
+### Boosting
+
+Boosting dla regresji `count` względem pozostałych zmiennych.
+
+```{r}
+count.boost <- gbm(count ~ ., data = bike[train, ], distribution = "gaussian", n.trees = 5000, interaction.depth = 4)
+count.boost
+```
+
+Wyznaczenie ważności predyktorów.
+
+```{r}
+summary(count.boost)
+```
+
+Oszacowanie błędu testowego dla poprzednio wyznaczonego zbioru walidacyjnego.
+
+```{r}
+count.boost.pred <- predict(count.boost, newdata = bike[test,], n.trees = 5000)
+mean((count.boost.pred - bike$count[test])^2)
+```
+
+To samo dla `shrinkage = 0.01`.
+
+```{r}
+count.boost <- gbm(count ~ ., data = bike[train, ], distribution = "gaussian", n.trees = 5000, interaction.depth = 4, shrinkage = 0.01)
+count.boost.pred <- predict(count.boost, newdata = bike[test,], n.trees = 5000)
+mean((count.boost.pred - bike$count[test])^2)
+```
+
+To samo dla `interaction.depth = 1`.
+
+```{r}
+count.boost <- gbm(count ~ ., data = bike[train, ], distribution = "gaussian", n.trees = 5000, interaction.depth = 1, shrinkage = 0.01)
+count.boost.pred <- predict(count.boost, newdata = bike[test,], n.trees = 5000)
+mean((count.boost.pred - bike$count[test])^2)
+```
