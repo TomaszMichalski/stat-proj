@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tree)
 library(randomForest)
 library(gbm)
+library(class)
 ```
 
 ## Wstęp
@@ -89,10 +90,20 @@ summary(lmFit)
 
 Korzystając z `summary`, możemy zauważyć, że cechami najbardziej istotnymi statystycznie są `humidity`, `month` oraz `hour`.
 
-## TODO
+```{r}
+mean((bike[test]$count - predict(lmFit, bike)[test]) ^ 2)
+```
 
-## TODO
+## kNN
 
+kNN dla regresji jest raczej rzadko używana, ale byliśmy ciekawi takiego naiwnego podejścia.
+
+```{r}
+nn3 <- knn(bike[train,], bike[test,], cl=bike[train,]$count, k = 3)
+mean((bike[test]$count - as.numeric(nn3)) ^ 2)
+nn7 <- knn(bike[train,], bike[test,], cl=bike[train,]$count, k = 7)
+mean((bike[test]$count - as.numeric(nn7)) ^ 2)
+```
 ## Drzewa decyzyjne
 
 ### Drzewa regresyjne
@@ -210,3 +221,7 @@ count.boost <- gbm(count ~ ., data = bike[train, ], distribution = "gaussian", n
 count.boost.pred <- predict(count.boost, newdata = bike[test,], n.trees = 5000)
 mean((count.boost.pred - bike$count[test])^2)
 ```
+
+# Wnioski
+
+Porównując algorytmy regresji liniowej można zauważyć, że najlepiej radzą sobie drzewa losowe wraz z kilkoma ich usprawnieniami (głównie Boosting). Jest to w sumie zgodne z naszymi oczekiwaniami, drzewa losowe najlepiej radzą sobie z wychwytywaniem istniejących trendów w danych.
